@@ -105,10 +105,10 @@ let count = 0;
 // }, 5000);
 
 const PORT = 8080;
-if (process.env.CERT_PATH) {
+if (process.env.PRIVATE_KEY && process.env.CERT_PATH) {
   let options = {
-    key: fs.readFileSync(`${process.env.CERT_PATH}.key`),
-    cert: fs.readFileSync(`${process.env.CERT_PATH}.crt`),
+    key: fs.readFileSync(`${process.env.PRIVATE_KEY}`),
+    cert: fs.readFileSync(`${process.env.CERT_PATH}`),
     rejectUnauthorized: false
   };
 
