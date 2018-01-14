@@ -96,13 +96,21 @@ setInterval(() => {
   count++;
 }, 5000);
 
-let options = {
-  key: fs.readFileSync(`${process.env.CERT_PATH}.key`),
-  cert: fs.readFileSync(`${process.env.CERT_PATH}.crt`),
-  rejectUnauthorized: false
-};
-
 const PORT = 8080;
-https.createServer(options, app).listen(PORT, function () {
-  console.log('Extension Boilerplate service running on https', PORT);
-});
+if (process.env.CERT_PATH) {
+  let options = {
+    key: fs.readFileSync(`${process.env.CERT_PATH}.key`),
+    cert: fs.readFileSync(`${process.env.CERT_PATH}.crt`),
+    rejectUnauthorized: false
+  };
+
+  https.createServer(options, app).listen(PORT, function () {
+    console.log('Extension Boilerplate service running on https', PORT);
+  });
+}
+else {
+  const PORT = 8080;
+  http.createServer(app).listen(PORT, function () {
+    console.log('Extension Boilerplate service running on http', PORT);
+  });
+}
