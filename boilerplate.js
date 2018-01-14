@@ -52,6 +52,13 @@ app.post('/hello', (req, res) => {
   });
 });
 
+// A simple get page for testing domains
+app.get('/page', (req, res) => {
+  return res.json({
+    success: true
+  });
+});
+
 const currentTime = new Date().getTime() / 1000;
 const expirationTime = 60 * 60 * 24 * 7; // A week
 const exp = Math.floor(currentTime + expirationTime);
@@ -72,30 +79,30 @@ const signedJwt = jwt.sign(token, decodedSecret);
 let count = 0;
 
 // Every interval send updated gamestate to viewers
-setInterval(() => {
-  console.log("sending message to pubsub, nr:", count);
-  axios({
-    method: 'post',
-    url: `https://api.twitch.tv/extensions/message/${userId}`,
-    data: {
-      "content_type": "application/json",
-      "message": JSON.stringify(gameState),
-      "targets": ["broadcast"]
-    },
-    headers: {
-      'Authorization': `Bearer ${signedJwt}`,
-      'Client-Id': clientId,
-      'Content-Type': 'application/json'
-    }
-  }).then((res) => {
-    // console.log("response ?", res);
-    console.log("got response with status", res.status);
-  }).catch(err => {
-    console.log("got error ?", err);
-  });
-
-  count++;
-}, 5000);
+// setInterval(() => {
+//   console.log("sending message to pubsub, nr:", count);
+//   axios({
+//     method: 'post',
+//     url: `https://api.twitch.tv/extensions/message/${userId}`,
+//     data: {
+//       "content_type": "application/json",
+//       "message": JSON.stringify(gameState),
+//       "targets": ["broadcast"]
+//     },
+//     headers: {
+//       'Authorization': `Bearer ${signedJwt}`,
+//       'Client-Id': clientId,
+//       'Content-Type': 'application/json'
+//     }
+//   }).then((res) => {
+//     // console.log("response ?", res);
+//     console.log("got response with status", res.status);
+//   }).catch(err => {
+//     console.log("got error ?", err);
+//   });
+//
+//   count++;
+// }, 5000);
 
 const PORT = 8080;
 if (process.env.CERT_PATH) {
