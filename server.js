@@ -104,7 +104,7 @@ let count = 0;
 //   count++;
 // }, 5000);
 
-const PORT = 8080;
+const APP_PORT = process.env.APP_PORT || 80;
 if (process.env.PRIVATE_KEY && process.env.CERT_PATH) {
   let options = {
     key: fs.readFileSync(`${process.env.PRIVATE_KEY}`),
@@ -112,13 +112,12 @@ if (process.env.PRIVATE_KEY && process.env.CERT_PATH) {
     rejectUnauthorized: false
   };
 
-  https.createServer(options, app).listen(PORT, function () {
-    console.log('Extension Boilerplate service running on https', PORT);
+  https.createServer(options, app).listen(APP_PORT, function () {
+    console.log('Extension Boilerplate service running on https', APP_PORT);
   });
 }
 else {
-  const PORT = 8080;
-  http.createServer(app).listen(PORT, function () {
-    console.log('Extension Boilerplate service running on http', PORT);
+  http.createServer(app).listen(APP_PORT, function () {
+    console.log('Extension Boilerplate service running on http', APP_PORT);
   });
 }
