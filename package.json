@@ -1,5 +1,8 @@
 {
   "author": "Twitch Interactive, Inc.",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "axios": "^0.17.1",
     "dotenv": "^4.0.0",
