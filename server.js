@@ -1,4 +1,5 @@
 "use strict";
+console.log("does this shit ever run ???");
 require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
@@ -104,7 +105,8 @@ let count = 0;
 //   count++;
 // }, 5000);
 
-const APP_PORT = process.env.APP_PORT || 80;
+const APP_PORT = process.env.PORT || 3000;
+console.log("what is port ???", process.env.PORT, APP_PORT);
 if (process.env.PRIVATE_KEY && process.env.CERT_PATH) {
   let options = {
     key: fs.readFileSync(`${process.env.PRIVATE_KEY}`),
