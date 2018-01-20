@@ -1,19 +1,20 @@
 "use strict";
-console.log("does this shit ever run ???");
+
 require('dotenv').config();
 const express = require('express');
-const fs = require('fs');
-const https = require('https');
 const http = require('http');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 
 const ebsSecret = process.env.EBS_SECRET;
+const decodedSecret = Buffer.from(ebsSecret, 'base64');
 const app = express();
 
-// TODO: Fix hardcoded values
-const userId = 19733510;
+/**
+ * Client Id is static for extensions
+ * @type {string}
+ */
 const clientId = '92ydmhd13dzrhhp087hyxqu3jks7f6';
 
 app.use((req, res, next) => {
@@ -27,99 +28,192 @@ app.use((req, res, next) => {
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-const gameState = {
-  talents: null,
-  displayingTalents: false
+// A list of broadcasters with connected viewers
+const state = {
+  broadCasters: [],
 };
 
+function generateJwt(userId, channelId) {
+  const currentTime = new Date().getTime() / 1000;
+  const expirationTime = 60 * 60 * 24 * 2; // 2 days
+  const exp = Math.floor(currentTime + expirationTime);
+
+  const token = {
+    "exp": exp,
+    "user_id": userId.toString(),
+    "role": "external",
+    "channel_id": channelId.toString(),
+    "pubsub_perms": {
+      "send": ["*"]
+    }
+  };
+
+  return jwt.sign(token, decodedSecret);
+}
+
+async function dispatchBroadcasterGameState(channelId, gameState, clientId) {
+  const signedJwt = generateJwt(channelId, channelId);
+  let response = null;
+  await axios({
+    method: 'post',
+    url: `https://api.twitch.tv/extensions/message/${channelId}`,
+    data: {
+      "content_type": "application/json",
+      "message": JSON.stringify(gameState),
+      "targets": ["broadcast"]
+    },
+    headers: {
+      'Authorization': `Bearer ${signedJwt}`,
+      'Client-Id': clientId,
+      'Content-Type': 'application/json'
+    }
+  }).then(() => {
+    response = {
+      success: true,
+    };
+  }).catch(err => {
+    response = {
+      success: false,
+      error: err,
+    };
+  });
+  return response;
+}
+
+// Registers a broadcaster
 app.post('/hello', (req, res) => {
-  if (req.body) {
-    // Game started, enable talents overlay
-    if (req.body.talents) {
-      // Store talents for later
-      console.log("we got talents ?", req.body.talents);
-      gameState.talents = req.body.talents;
+  if (!req.body || !req.body.token) {
+    return res.json({
+      success: false,
+      error: 'No valid request body provided.',
+    });
+  }
+
+  const payload = jwt.verify(req.body.token, decodedSecret);
+  if (payload.role !== 'broadcaster') {
+    return res.json({
+      success: false,
+      error: 'Not a broadcaster token',
+    });
+  }
+
+  const channelId = payload.channel_id;
+
+  let broadCaster = state.broadCasters.find(bc => bc.id === channelId);
+  if (!broadCaster) {
+    broadCaster = {
+      id: channelId,
+      gameState: {},
+      viewers: [],
+    };
+
+    state.broadCasters.push(broadCaster);
+  }
+
+  // Set talents
+  if (req.body.talents) {
+    broadCaster.gameState.talents = req.body.talents;
+  }
+
+  // Set visibility of talents
+  if (req.body.displayingTalents !== undefined) {
+    broadCaster.gameState.displayingTalents = req.body.displayingTalents;
+  }
+
+  // Dispatch if state was updated
+  if (req.body.talents || req.body.displayingTalents !== undefined) {
+    dispatchBroadcasterGameState(
+      broadCaster.id,
+      broadCaster.gameState,
+      clientId,
+    ).then(response => res.json(response))
+      .catch(err => res.json({
+          success: false,
+          error: err,
+        })
+      );
+  }
+  else {
+    return res.json({
+      success: true,
+    });
+  }
+});
+
+// Register viewer
+app.post('/register-viewer', (req, res) => {
+  // Validate request
+  if (!req.body || !req.body.token || !req.body.userId || !req.body.channelId) {
+    res.json({
+      success: false,
+      error: 'Missing required data',
+    });
+  }
+
+  // Verify that their info is correct
+  const payload = jwt.verify(req.body.token, decodedSecret);
+  if (!(payload.user_id !== req.body.userId || payload.channel_id !== req.body.channelId)) {
+    res.json({
+      success: false,
+      error: 'Token payload and post data mismatch',
+    });
+  }
+
+  // Register with broadcaster
+  const broadcaster = state.broadCasters.find(bc => bc.id === req.body.channelId);
+  if (broadcaster) {
+    // Register with broadcaster
+    const viewer = broadcaster.viewers.find(viewer => viewer === req.body.userId);
+    if (!viewer) {
+      broadcaster.viewers.push(req.body.userId);
     }
 
-    if (req.body.displayingTalents !== undefined) {
-      // Determines if talents should be shown
-      console.log("we are ingame, display talents on mouseover ?", req.body.displayingTalents);
-      gameState.displayingTalents = req.body.displayingTalents;
-    }
+    res.json({
+      success: true,
+      'gameState': broadcaster.gameState,
+    });
+  }
+  else {
+    res.json({
+      success: false,
+      error: 'Invalid broadcaster',
+    })
+  }
+
+  res.json({
+    success: false,
+    error: 'Missing userId and channelId',
+  });
+});
+
+// De-register a broadcaster
+app.post('/byebye', (req, res) => {
+  if (!req.body || !req.body.broadCasterId) {
+    return res.json({
+      success: false,
+    });
+  }
+
+  const broadCaster = state.broadCasters
+    .findIndex(bc => bc.id === req.body.broadCasterId);
+
+  if (broadCaster !== -1) {
+    state.broadCasters = state.broadCasters.splice(broadCaster);
   }
 
   return res.json({
     success: true,
-  });
+  })
 });
 
 // A simple get page for testing domains
-app.get('/page', (req, res) => {
+app.get('/status', (req, res) => {
   return res.json({
     success: true
   });
 });
 
-const currentTime = new Date().getTime() / 1000;
-const expirationTime = 60 * 60 * 24 * 7; // A week
-const exp = Math.floor(currentTime + expirationTime);
-
-const token = {
-  "exp": exp,
-  "user_id": userId.toString(), // TODO: Receive from broadcaster
-  "role": "external",
-  "channel_id": userId.toString(),
-  "pubsub_perms": {
-    "send": ["*"]
-  }
-};
-
-// Must base64 decode secret because jsonwebtoken module is retarded
-const decodedSecret = Buffer.from(ebsSecret, 'base64');
-const signedJwt = jwt.sign(token, decodedSecret);
-let count = 0;
-
-// Every interval send updated gamestate to viewers
-// setInterval(() => {
-//   console.log("sending message to pubsub, nr:", count);
-//   axios({
-//     method: 'post',
-//     url: `https://api.twitch.tv/extensions/message/${userId}`,
-//     data: {
-//       "content_type": "application/json",
-//       "message": JSON.stringify(gameState),
-//       "targets": ["broadcast"]
-//     },
-//     headers: {
-//       'Authorization': `Bearer ${signedJwt}`,
-//       'Client-Id': clientId,
-//       'Content-Type': 'application/json'
-//     }
-//   }).then((res) => {
-//     // console.log("response ?", res);
-//     console.log("got response with status", res.status);
-//   }).catch(err => {
-//     console.log("got error ?", err);
-//   });
-//
-//   count++;
-// }, 5000);
-
 const APP_PORT = process.env.PORT || 3000;
-console.log("what is port ???", process.env.PORT, APP_PORT);
-if (process.env.PRIVATE_KEY && process.env.CERT_PATH) {
-  let options = {
-    key: fs.readFileSync(`${process.env.PRIVATE_KEY}`),
-    cert: fs.readFileSync(`${process.env.CERT_PATH}`),
-    rejectUnauthorized: false
-  };
-
-  https.createServer(options, app).listen(APP_PORT, function () {
-    console.log('Extension Boilerplate service running on https', APP_PORT);
-  });
-}
-else {
-  http.createServer(app).listen(APP_PORT, function () {
-    console.log('Extension Boilerplate service running on http', APP_PORT);
-  });
-}
+http.createServer(app).listen(APP_PORT, function () {
+  console.log('Dota Illuminate service running on http', APP_PORT);
+});
