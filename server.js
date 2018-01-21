@@ -146,7 +146,7 @@ app.post('/register-viewer', (req, res) => {
   console.log("registering viewer", req.body);
   // Validate request
   if (!req.body || !req.body.token || !req.body.userId || !req.body.channelId) {
-    res.json({
+    return res.json({
       success: false,
       error: 'Missing required data',
     });
@@ -155,7 +155,7 @@ app.post('/register-viewer', (req, res) => {
   // Verify that their info is correct
   const payload = jwt.verify(req.body.token, decodedSecret);
   if (!(payload.user_id !== req.body.userId || payload.channel_id !== req.body.channelId)) {
-    res.json({
+    return res.json({
       success: false,
       error: 'Token payload and post data mismatch',
     });
@@ -170,22 +170,17 @@ app.post('/register-viewer', (req, res) => {
       broadcaster.viewers.push(req.body.userId);
     }
 
-    res.json({
+    return res.json({
       success: true,
       'gameState': broadcaster.gameState,
     });
   }
   else {
-    res.json({
+    return res.json({
       success: false,
       error: 'Invalid broadcaster',
     })
   }
-
-  res.json({
-    success: false,
-    error: 'Missing userId and channelId',
-  });
 });
 
 // De-register a broadcaster
@@ -200,7 +195,7 @@ app.post('/byebye', (req, res) => {
   // Verify token
   const payload = jwt.verify(req.body.token, decodedSecret);
   if (!payload || !payload.channel_id || payload.role !== 'broadcaster') {
-    res.json({
+    return res.json({
       success: false,
       error: 'Invalid termination token',
     });
