@@ -54,6 +54,7 @@ function generateJwt(userId, channelId) {
 async function dispatchBroadcasterGameState(channelId, gameState, clientId) {
   const signedJwt = generateJwt(channelId, channelId);
   let response = null;
+  console.log("dispatching game state", gameState, channelId);
   await axios({
     method: 'post',
     url: `https://api.twitch.tv/extensions/message/${channelId}`,
@@ -82,6 +83,7 @@ async function dispatchBroadcasterGameState(channelId, gameState, clientId) {
 
 // Registers a broadcaster
 app.post('/hello', (req, res) => {
+  console.log("got hello request", req.body);
   if (!req.body || !req.body.token) {
     return res.json({
       success: false,
@@ -142,6 +144,7 @@ app.post('/hello', (req, res) => {
 
 // Register viewer
 app.post('/register-viewer', (req, res) => {
+  console.log("registering viewer", req.body);
   // Validate request
   if (!req.body || !req.body.token || !req.body.userId || !req.body.channelId) {
     res.json({
