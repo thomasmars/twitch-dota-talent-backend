@@ -51,7 +51,7 @@ function generateJwt(userId, channelId) {
   return jwt.sign(token, decodedSecret);
 }
 
-async function dispatchBroadcasterGameState(channelId, gameState, clientId) {
+async function dispatchBroadcasterGameState(channelId, gameState) {
   const signedJwt = generateJwt(channelId, channelId);
   let response = null;
   console.log("dispatching game state", gameState, channelId);
@@ -127,7 +127,6 @@ app.post('/hello', (req, res) => {
     dispatchBroadcasterGameState(
       broadCaster.id,
       broadCaster.gameState,
-      clientId,
     ).then(response => res.json(response))
       .catch(err => res.json({
           success: false,
@@ -191,22 +190,45 @@ app.post('/register-viewer', (req, res) => {
 
 // De-register a broadcaster
 app.post('/byebye', (req, res) => {
-  if (!req.body || !req.body.broadCasterId) {
+  console.log("removing broadcaster gameState", req.body);
+  if (!req.body || !req.body.token) {
     return res.json({
       success: false,
     });
   }
 
+  // Verify token
+  const payload = jwt.verify(req.body.token, decodedSecret);
+  if (!payload || !payload.channel_id || payload.role !== 'broadcaster') {
+    res.json({
+      success: false,
+      error: 'Invalid termination token',
+    });
+  }
+  const broadcasterId = payload.channel_id;
+
   const broadCaster = state.broadCasters
-    .findIndex(bc => bc.id === req.body.broadCasterId);
+    .findIndex(bc => bc.id === broadcasterId);
 
   if (broadCaster !== -1) {
+    // Remove twitch extension overlay for viewers
+    dispatchBroadcasterGameState(broadCaster.id, {
+      displayingTalents: false,
+      talents: [],
+    }).then(response => res.json(response))
+      .catch(err => res.json({
+          success: false,
+          error: err,
+        })
+      );
     state.broadCasters = state.broadCasters.splice(broadCaster);
   }
-
-  return res.json({
-    success: true,
-  })
+  else {
+    return res.json({
+      success: false,
+      error: 'No broadcaster found with that id',
+    })
+  }
 });
 
 // A simple get page for testing domains
