@@ -207,14 +207,19 @@ app.post('/byebye', (req, res) => {
 
   if (broadCaster !== -1) {
     // Remove twitch extension overlay for viewers
-    dispatchBroadcasterGameState(broadCaster.id, {
+    dispatchBroadcasterGameState(broadcasterId, {
       displayingTalents: false,
       talents: [],
-    }).then(response => res.json(response))
-      .catch(err => res.json({
-          success: false,
-          error: err,
-        })
+    }).then(response => {
+      console.log("successfully stopped broadcasting talents for id", broadcasterId);
+      return res.json(response)
+    }).catch(err => {
+        console.log("failed stopping broadcast", err);
+        return res.json({
+            success: false,
+            error: err,
+          })
+        }
       );
     state.broadCasters = state.broadCasters.splice(broadCaster);
   }
