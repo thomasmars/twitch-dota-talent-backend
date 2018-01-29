@@ -122,6 +122,10 @@ app.post('/hello', (req, res) => {
     broadCaster.gameState.displayingTalents = req.body.displayingTalents;
   }
 
+  if (req.body.chosenTalents !== undefined) {
+    broadCaster.gameState.chosenTalents = req.body.chosenTalents;
+  }
+
   // Dispatch if state was updated
   if (req.body.talents || req.body.displayingTalents !== undefined) {
     dispatchBroadcasterGameState(
@@ -237,6 +241,8 @@ app.get('/status', (req, res) => {
     success: true
   });
 });
+
+app.use('/dist', express.static('dist'));
 
 const APP_PORT = process.env.PORT || 3000;
 http.createServer(app).listen(APP_PORT, function () {
